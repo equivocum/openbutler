@@ -17,6 +17,9 @@ state/wave.json
 state/mood.json
 logs/
 
+# Local-only tracker + port notes (live here, never in the repo).
+docs/
+
 # Editor / OS droppings (never commit).
 .DS_Store
 *~

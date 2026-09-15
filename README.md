@@ -181,8 +181,7 @@ itself is set via `.env` + re-render (see above), not `config set`.
   `~/.cache` and are never committed.
 
 See `CONTRIBUTING.md` for build discipline (heavy-binary rules that will
-save you gigabytes and hours) and `docs/STATUS.md` for the verified
-phase history.
+save you gigabytes and hours).
 
 ## Troubleshooting
 
