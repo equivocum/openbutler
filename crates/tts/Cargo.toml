@@ -1,0 +1,19 @@
+[package]
+name = "openbutler-tts"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+# Kokoro-82M TTS: tts-rs engine VENDORED in src/tts (upstream doesn't compile
+# against any published ort: rc.10 lacks ViewRepr tensor impls, rc.11+ renamed
+# provider/error APIs). Deps mirror upstream tts-rs kokoro requirements.
+openbutler-common = { path = "../common" }
+ort = "2.0.0-rc.13"
+ndarray = "0.17"
+zip = { version = "2", default-features = false, features = ["deflate"] }
+thiserror = "2"
+log = "0.4"
+hound = "3"
+serde_json = "1"
+base64 = "0.22"

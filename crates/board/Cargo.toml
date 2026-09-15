@@ -1,0 +1,13 @@
+[package]
+name = "openbutler-board"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+openbutler-common = { path = "../common" }
+axum = "0.8"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "time", "signal"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+# Phase 1: axum, serde/serde_json, tracing (static served from ../ui/board)

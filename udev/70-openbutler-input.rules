@@ -1,0 +1,7 @@
+# OpenButler PTT access: let the active-seat user read input devices (evdev),
+# so push-to-talk works on Wayland/X11/console without joining the `input` group.
+# Install: copy to /etc/udev/rules.d/70-openbutler-input.rules,
+# then: udevadm control --reload && udevadm trigger
+# (A legacy 70-jarvis-input.rules file is also honored by `setup check`.)
+# Blocking hotkeys additionally need: KERNEL=="uinput", TAG+="uaccess"
+SUBSYSTEM=="input", KERNEL=="event*", TAG+="uaccess"

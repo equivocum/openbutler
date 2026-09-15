@@ -1,0 +1,16 @@
+[package]
+name = "openbutler-stt"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+# CPU-only CTranslate2 Whisper (same engine + weights as faster-whisper).
+# `mkl` = prebuilt Intel MKL GEMM (float32 works everywhere on x86_64).
+# Phase-5: add `dnnl` (oneDNN from source) for VNNI int8 kernels == pip wheel.
+ct2rs = { version = "0.10", default-features = false, features = ["whisper", "mkl"] }
+hound = "3"
+ndarray = "0.16"
+rustfft = "6"
+num-complex = "0.4"
+serde_json = "1"

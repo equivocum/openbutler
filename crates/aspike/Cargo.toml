@@ -1,0 +1,10 @@
+[package]
+name = "openbutler-aspike"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+cpal = "0.16"
+wavekat-vad = "0.1"
+hotkey-listener = "0.3"

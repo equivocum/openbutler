@@ -1,0 +1,17 @@
+[package]
+name = "openbutler-voice"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+openbutler-common = { path = "../common" }
+serde_json = { version = "1", features = ["preserve_order"] }
+# Phase 5 orchestrator: audio in/out, VAD, PTT, signals, STT/TTS engines.
+# Versions pinned to the spike crates so the shared target/ cache is reused.
+cpal = "0.16"
+wavekat-vad = "0.1"
+evdev = "0.12"
+signal-hook = "0.3"
+base64 = "0.22"
+openbutler-stt = { path = "../stt" }
