@@ -498,6 +498,9 @@ pub enum SettingKind {
     PositiveFloat,
     /// One of the listed strings (exact).
     OneOf(&'static [&'static str]),
+    /// Wake-model id: lowercase letters, digits, underscores
+    /// (checked against models/wake.json at use time).
+    WakeModel,
     /// Any non-empty string (validated at use time, e.g. voice list).
     Text,
 }
@@ -559,6 +562,11 @@ pub const SETTINGS: &[Setting] = &[
         key: "board.port",
         prompt: "Board port (127.0.0.1)",
         kind: SettingKind::Port,
+    },
+    Setting {
+        key: "wake.model",
+        prompt: "Wake-word model id (hey_jarvis/alexa/hey_mycroft/hey_rhasspy/timer/weather; see models/wake.json)",
+        kind: SettingKind::WakeModel,
     },
     Setting {
         key: "wake.threshold",
@@ -636,6 +644,19 @@ pub fn parse_setting(key: &str, raw: &str) -> Result<serde_json::Value, String> 
                 Err(format!("{key} can't be empty"))
             } else {
                 Ok(serde_json::Value::String(raw.to_string()))
+            }
+        }
+        SettingKind::WakeModel => {
+            let ok = !raw.is_empty()
+                && raw
+                    .chars()
+                    .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_');
+            if ok {
+                Ok(serde_json::Value::String(raw.to_string()))
+            } else {
+                Err(format!(
+                    "{key} wants a model id like hey_jarvis (lowercase, digits, underscores; see models/wake.json)"
+                ))
             }
         }
     }
@@ -828,6 +849,21 @@ mod tests {
         // Nonsense is far from everything.
         let r = rank_voices(&vs, &fold_voice("xyzzy plugh"));
         assert!(!voice_close_enough(&fold_voice("xyzzy plugh"), r[0].1));
+    }
+
+    #[test]
+    fn wake_model_validates() {
+        assert_eq!(
+            parse_setting("wake.model", "alexa").unwrap(),
+            serde_json::json!("alexa")
+        );
+        assert_eq!(
+            parse_setting("wake.model", "hey_mycroft").unwrap(),
+            serde_json::json!("hey_mycroft")
+        );
+        assert!(parse_setting("wake.model", "Hey Jarvis").is_err());
+        assert!(parse_setting("wake.model", "").is_err());
+        assert!(find_setting("wake.model").is_some());
     }
 
     #[test]

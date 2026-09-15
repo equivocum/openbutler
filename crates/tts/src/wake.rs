@@ -1,4 +1,4 @@
-// wake.rs — openWakeWord "hey jarvis" scorer inside the stts serve child.
+// wake.rs — openWakeWord scorer inside the tts serve child.
 //
 // Same ort process as Kokoro (the voice binary cannot link ort: the
 // ort+sentencepiece protobuf-lite clash is what forced TTS into this
@@ -52,14 +52,10 @@ fn open_session(path: &Path) -> Result<Session, String> {
 }
 
 impl WakeScorer {
-    /// Load the three graphs from dir. Kept lazy by callers so
-    /// TTS-only startup pays nothing.
-    pub fn load(dir: &Path) -> Result<Self, String> {
-        for f in [
-            "melspectrogram.onnx",
-            "embedding_model.onnx",
-            "hey_jarvis_v0.1.onnx",
-        ] {
+    /// Load the three graphs from dir with the given classifier file.
+    /// Kept lazy by callers so TTS-only startup pays nothing.
+    pub fn load(dir: &Path, clf_file: &str) -> Result<Self, String> {
+        for f in ["melspectrogram.onnx", "embedding_model.onnx", clf_file] {
             if !dir.join(f).is_file() {
                 return Err(format!(
                     "wake model missing: {} (see models/wake.json)",
@@ -70,7 +66,7 @@ impl WakeScorer {
         Ok(Self {
             mel: open_session(&dir.join("melspectrogram.onnx"))?,
             emb: open_session(&dir.join("embedding_model.onnx"))?,
-            clf: open_session(&dir.join("hey_jarvis_v0.1.onnx"))?,
+            clf: open_session(&dir.join(clf_file))?,
             pcm: Vec::with_capacity(CTX_SAMPLES * 2),
         })
     }
@@ -179,7 +175,10 @@ mod tests {
 
     #[test]
     fn missing_dir_errors() {
-        let r = WakeScorer::load(std::path::Path::new("/nonexistent-wake-dir-xyz"));
+        let r = WakeScorer::load(
+            std::path::Path::new("/nonexistent-wake-dir-xyz"),
+            "hey_jarvis_v0.1.onnx",
+        );
         assert!(r.is_err());
     }
 
@@ -190,7 +189,7 @@ mod tests {
             eprintln!("wake models absent, skipping");
             return;
         }
-        let mut w = WakeScorer::load(&dir).unwrap();
+        let mut w = WakeScorer::load(&dir, "hey_jarvis_v0.1.onnx").unwrap();
         assert_eq!(w.score().unwrap(), 0.0); // empty buffer, no graphs run
         w.push(&vec![0.0f32; 32000]); // 2s digital silence
         let s = w.score().unwrap();

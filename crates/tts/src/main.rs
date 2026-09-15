@@ -140,14 +140,19 @@ fn cmd_serve(dir: &Path) -> i32 {
     let mut out = std::io::stdout().lock();
     // Wake scorer: lazy (TTS-only callers pay nothing) + stateful
     // (feature context lives across frames; reset after detections).
+    // One slot: a `wake` request naming a different classifier drops the
+    // loaded one (model switches are rare; correctness over speed).
     let mut waker: Option<wake::WakeScorer> = None;
+    let mut waker_file = String::new();
     let wdir = wake_dir();
-    let mut ensure_waker = |waker: &mut Option<wake::WakeScorer>| -> Result<(), String> {
-        if waker.is_none() {
-            *waker = Some(wake::WakeScorer::load(&wdir)?);
-        }
-        Ok(())
-    };
+    let mut ensure_waker =
+        |waker: &mut Option<wake::WakeScorer>, file: &str| -> Result<(), String> {
+            if waker.is_none() || waker_file != file {
+                *waker = Some(wake::WakeScorer::load(&wdir, file)?);
+                waker_file = file.to_string();
+            }
+            Ok(())
+        };
     for line in stdin.lock().lines() {
         let line = match line {
             Ok(l) => l,
@@ -188,7 +193,13 @@ fn cmd_serve(dir: &Path) -> i32 {
         if req.get("cmd").and_then(|v| v.as_str()) == Some("wake") {
             let id = req.get("id").cloned().unwrap_or(serde_json::Value::Null);
             let rep = (|| -> Result<serde_json::Value, String> {
-                ensure_waker(&mut waker)?;
+                let file = req
+                    .get("model_file")
+                    .and_then(|v| v.as_str())
+                    .filter(|s| !s.is_empty() && !s.contains(['/', '\\']))
+                    .unwrap_or("hey_jarvis_v0.1.onnx")
+                    .to_string();
+                ensure_waker(&mut waker, &file)?;
                 let w = waker.as_mut().unwrap();
                 if req.get("reset").and_then(|v| v.as_bool()).unwrap_or(false) {
                     w.reset();

@@ -1,11 +1,7 @@
 {
-  "_note": "Wake-word model pins. Weights live in ~/.cache/jarvis/wake/, never committed. Source: dscripka/openWakeWord releases v0.5.1 (Apache-2.0).",
+  "_note": "Wake-word model pins. Weights live in ~/.cache/jarvis/wake/, never committed. Source: dscripka/openWakeWord releases v0.5.1 (Apache-2.0). `files` are the shared frontend graphs; `models` maps a wake.model id to its classifier + the phrase users say.",
   "base_url": "https://github.com/dscripka/openWakeWord/releases/download/v0.5.1",
   "files": {
-    "hey_jarvis_v0.1.onnx": {
-      "sha256": "94a13cfe60075b132f6a472e7e462e8123ee70861bc3fb58434a73712ee0d2cb",
-      "bytes": 1271370
-    },
     "melspectrogram.onnx": {
       "sha256": "ba2b0e0f8b7b875369a2c89cb13360ff53bac436f2895cced9f479fa65eb176f",
       "bytes": 1087958
@@ -13,6 +9,44 @@
     "embedding_model.onnx": {
       "sha256": "70d164290c1d095d1d4ee149bc5e00543250a7316b59f31d056cff7bd3075c1f",
       "bytes": 1326578
+    }
+  },
+  "models": {
+    "hey_jarvis": {
+      "file": "hey_jarvis_v0.1.onnx",
+      "sha256": "94a13cfe60075b132f6a472e7e462e8123ee70861bc3fb58434a73712ee0d2cb",
+      "bytes": 1271370,
+      "phrase": "hey jarvis"
+    },
+    "alexa": {
+      "file": "alexa_v0.1.onnx",
+      "sha256": "6ff566a01d12670e8d9e3c59da32651db1575d17272a601b7f8a39283dfbae3e",
+      "bytes": 854246,
+      "phrase": "alexa"
+    },
+    "hey_mycroft": {
+      "file": "hey_mycroft_v0.1.onnx",
+      "sha256": "c2a311e8fa1338de89c31b3b46dc4dffd4af2f9a8d6ddead48893c2d301b1f18",
+      "bytes": 857691,
+      "phrase": "hey mycroft"
+    },
+    "hey_rhasspy": {
+      "file": "hey_rhasspy_v0.1.onnx",
+      "sha256": "5a9b3ed3be2910e35780e097905aa9f35a9c10038df47914cf2b3ec4d670f6ea",
+      "bytes": 204081,
+      "phrase": "hey rhasspy"
+    },
+    "timer": {
+      "file": "timer_v0.1.onnx",
+      "sha256": "371e44535470a29248b3b8f1bbbbaf2525c86417fd8f75c67fcf02ae0b9626df",
+      "bytes": 1742475,
+      "phrase": "timer"
+    },
+    "weather": {
+      "file": "weather_v0.1.onnx",
+      "sha256": "8441da8e746899e8d969528d5bad5651cdd563079c05962788f77753041f60e7",
+      "bytes": 1149158,
+      "phrase": "weather"
     }
   }
 }

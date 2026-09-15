@@ -69,7 +69,7 @@ Weights live in `~/.cache` (override with `KOKORO_DIR`, `JARVIS_WAKE_DIR`,
 
 | Model | How it arrives | Size |
 |---|---|---|
-| Wake word (`hey_jarvis` + mel + embedding ONNX) | `setup init` downloads from openWakeWord releases (pins + sha256 in `models/wake.json`) | ~4MB |
+| Wake word (frontend + `hey_jarvis` classifier) | `setup init` downloads from openWakeWord releases (pins + sha256 in `models/wake.json`, registry of 6: `hey_jarvis`, `alexa`, `hey_mycroft`, `hey_rhasspy`, `timer`, `weather`) | ~4MB |
 | Kokoro TTS (`kokoro-v1.0.onnx` + `voices-v1.0.bin`) | `setup init` fetches from the thewh1teagle `model-files-v1.0` release; manual fallback: drop any `*.onnx` + `voices-v1.0.bin` into `~/.cache/jarvis/kokoro` ([model](https://github.com/taylorchu/kokoro-onnx/releases/tag/v0.2.0), [voices](https://github.com/thewh1teagle/kokoro-onnx/releases/tag/model-files-v1.0)) | ~340MB |
 | Whisper STT (`small.en` default) | auto-downloads from HuggingFace Hub on first listen | hundreds of MB |
 
@@ -83,6 +83,13 @@ hang-up phrase: with name "Butler" you say *"goodbye butler"*.
 Change it later without losing tuning: edit `AGENT_NAME` in `.env`, then
 `openbutler-setup init --yes` to re-render (managed keys only; your voice,
 speed, effort and other tuning survive).
+
+**Wake word follows the name — when a stock classifier says it.** `init`
+matches your name against the built-in wake models (`models/wake.json`):
+"Alexa" → `alexa` ("alexa"), "Mycroft" → `hey_mycroft` ("hey mycroft"),
+anything Jarvis-like → `hey_jarvis` ("hey jarvis"), plus `hey_rhasspy`,
+`timer`, `weather`. A name with no matching classifier keeps the default
+(`hey_jarvis`) and `init` tells you so.
 
 ## Launch
 
@@ -110,7 +117,17 @@ speed, effort and other tuning survive).
 
 Spoken equivalents: "go hands free", "wake word mode", "push to talk
 mode". Wake sensitivity: `wake.threshold` / `wake.patience` /
-`wake.attention_s`.
+`wake.attention_s`. Switch classifier anytime (takes effect on next
+launch; `setup init` fetches it, `setup check` verifies its sha):
+
+```bash
+./target/debug/openbutler-voice config set wake.model alexa
+```
+
+A fully custom name needs a custom-trained classifier: train one with
+[openWakeWord](https://github.com/dscripka/openWakeWord), drop the `.onnx`
+into the wake cache dir, point `wake.model` at its id and `wake.phrase`
+at what users say (JSON-only advanced keys).
 
 ### Push-to-talk needs one sudo step
 

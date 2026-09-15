@@ -60,8 +60,8 @@ fn claim_single_instance() -> Option<std::net::TcpListener> {
     std::net::TcpListener::bind(("127.0.0.1", INSTANCE_PORT)).ok()
 }
 
-/// Phase 7 wake-word cycle: score 80ms mic ticks until "hey jarvis"
-/// fires (patience consecutive frames >= threshold), then capture
+/// Phase 7 wake-word cycle: score 80ms mic ticks until the configured
+/// phrase fires (patience consecutive frames >= threshold), then capture
 /// utterances for the attention window without re-wake. Returns on
 /// abort/mode-switch; the caller re-checks mode. Scoring pauses while
 /// the mouth speaks (unless barge-in) — own replies must not self-fire.
@@ -77,6 +77,8 @@ fn wake_cycle(
     patience: u32,
     attn_s: f64,
     gen: u64,
+    model_file: String,
+    phrase: String,
 ) {
     let aborted = || mic_state.lock().unwrap().gen != gen || ctrlc.load(Ordering::SeqCst);
     let wake_mode = || mic_state.lock().unwrap().mode == MicMode::Wake;
@@ -87,7 +89,7 @@ fn wake_cycle(
             return;
         }
     };
-    let mut serve = match crate::wake::WakeServe::new() {
+    let mut serve = match crate::wake::WakeServe::from_parts(model_file, phrase.clone()) {
         Ok(s) => s,
         Err(e) => {
             let _ = tx.send(Event::MicError(format!("wake scorer unavailable: {e}")));
@@ -165,10 +167,10 @@ fn wake_cycle(
             serve.shutdown();
             return;
         }
-        log("[wake] hey jarvis — listening");
+        log(&format!("[wake] {phrase} — listening"));
         serve.reset();
         // Keep up to 0.6s of mic audio that arrived during the scoring gap
-        // as pre-roll for the next utterance so "hey Jarvis what time"
+        // as pre-roll for the next utterance so "hey <name> what time"
         // doesn't lose "what". Tap is then closed — listen_once opens its
         // own cpal stream and two concurrent opens on flaky ALSA assert.
         let preroll = tap.take_preroll(9600);
@@ -201,7 +203,7 @@ fn wake_cycle(
                 }
             }
         }
-        log("[wake] attention over — sleeping until hey jarvis");
+        log(&format!("[wake] attention over — sleeping until {phrase}"));
         // Loop back to scoring without reloading the scorer — this is the
         // fast path that fixes post-answer wake delay. Fresh tap for next
         // scoring round.
@@ -329,6 +331,13 @@ pub fn run(
             f("attention_s", 8.0),
         )
     };
+    // Wake classifier + spoken phrase follow `wake.model` (registry in
+    // models/wake.json; `wake.phrase` overrides the spoken form).
+    // Resolved once here: `config set` changes apply on next launch.
+    let (wake_model, wake_file, wake_phrase) = crate::wake::resolve(home, &cfg);
+    log(&format!(
+        "[wake] model={wake_model} phrase=\"{wake_phrase}\""
+    ));
 
     // PTT key: deaf when /dev/input is unreadable (hands-free + typed
     // turns unaffected), mirroring ptt.py's import fallback.
@@ -469,8 +478,8 @@ pub fn run(
     // Open-mic capture loop: one utterance at a time, recreated after
     // each capture; yields while the BUTTON records and, without
     // barge-in, while the mouth speaks. In Wake mode this thread scores
-    // "hey jarvis" instead and only captures utterances inside the
-    // attention window after a detection.
+    // the configured phrase instead and only captures utterances inside
+    // the attention window after a detection.
     {
         let tx = tx.clone();
         let ears = ears.clone();
@@ -478,6 +487,8 @@ pub fn run(
         let mic_state = mic_state.clone();
         let ctrlc = ctrlc.clone();
         let barge_in = opts.barge_in;
+        let wake_file = wake_file.clone();
+        let wake_phrase = wake_phrase.clone();
         std::thread::Builder::new()
             .name("openmic".into())
             .spawn(move || {
@@ -493,8 +504,18 @@ pub fn run(
                     }
                     if mode == MicMode::Wake {
                         wake_cycle(
-                            &ears, &mouth, &mic_state, &tx, &ctrlc, barge_in, wake_thr, wake_pat,
-                            wake_attn, gen,
+                            &ears,
+                            &mouth,
+                            &mic_state,
+                            &tx,
+                            &ctrlc,
+                            barge_in,
+                            wake_thr,
+                            wake_pat,
+                            wake_attn,
+                            gen,
+                            wake_file.clone(),
+                            wake_phrase.clone(),
                         );
                         continue;
                     }
@@ -524,6 +545,7 @@ pub fn run(
     let mut app = App {
         cfg,
         home: home.to_path_buf(),
+        wake_phrase: wake_phrase.clone(),
         brain,
         mouth,
         ears,
@@ -640,6 +662,7 @@ fn mic_warned() -> &'static std::sync::Mutex<bool> {
 struct App {
     cfg: serde_json::Map<String, serde_json::Value>,
     home: std::path::PathBuf,
+    wake_phrase: String,
     brain: Arc<Mutex<Brain>>,
     mouth: Arc<Mouth>,
     ears: Arc<Ears>,
@@ -901,8 +924,11 @@ impl App {
                     "mic_mode",
                     serde_json::Value::String("wake".into()),
                 );
-                log("[console] mic_mode -> wake (hey jarvis)");
-                self.mouth.say("Wake word mode. I only listen after the wake word. Say go hands free to go back to always listening.");
+                log(&format!(
+                    "[console] mic_mode -> wake ({})",
+                    self.wake_phrase
+                ));
+                self.mouth.say(&format!("Wake word mode. I only listen after {}. Say go hands free to go back to always listening.", self.wake_phrase));
             }
             say_after = None;
         } else if verb == "noask" {

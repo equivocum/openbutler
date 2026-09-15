@@ -197,6 +197,125 @@ pub fn check_all(home: &Path, vars: &BTreeMap<String, String>) -> Vec<String> {
     drift
 }
 
+/// One registry entry: (id, classifier file, spoken phrase, pin).
+pub struct WakeModel {
+    pub id: String,
+    pub file: String,
+    pub phrase: String,
+    pub sha256: String,
+    pub bytes: u64,
+}
+
+/// Read the models/wake.json classifier registry (id -> file + phrase).
+pub fn wake_registry(home: &Path) -> Vec<WakeModel> {
+    let mut out = vec![];
+    let Ok(t) = std::fs::read_to_string(home.join("models/wake.json")) else {
+        return out;
+    };
+    let Ok(serde_json::Value::Object(o)) = serde_json::from_str(&t) else {
+        return out;
+    };
+    if let Some(models) = o.get("models").and_then(|v| v.as_object()) {
+        for (id, spec) in models {
+            out.push(WakeModel {
+                id: id.clone(),
+                file: spec
+                    .get("file")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string(),
+                phrase: spec
+                    .get("phrase")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string(),
+                sha256: spec
+                    .get("sha256")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string(),
+                bytes: spec.get("bytes").and_then(|v| v.as_u64()).unwrap_or(0),
+            });
+        }
+    }
+    out.sort_by(|a, b| a.id.cmp(&b.id));
+    out
+}
+
+/// Match an agent name to a classifier: "Alexa" -> alexa, "Mycroft" ->
+/// hey_mycroft ("hey <name>" equals the phrase). None when no stock
+/// model says the name — that needs a custom-trained classifier.
+pub fn derive_wake_model(home: &Path, agent_name: &str) -> Option<WakeModel> {
+    let low = agent_name.trim().to_lowercase();
+    if low.is_empty() {
+        return None;
+    }
+    wake_registry(home)
+        .into_iter()
+        .find(|m| m.phrase == low || m.phrase == format!("hey {low}") || m.id == low)
+}
+
+/// Set configs/voice.json wake.model when the file doesn't pin one yet.
+/// Never overrides existing tuning. Returns the effective (id, phrase).
+pub fn ensure_wake_model(home: &Path, id: &str) -> (String, String) {
+    let path = home.join("configs/voice.json");
+    let mut data: serde_json::Map<String, serde_json::Value> = std::fs::read_to_string(&path)
+        .ok()
+        .and_then(|t| serde_json::from_str(&t).ok())
+        .unwrap_or_default();
+    let cur = data
+        .get("wake")
+        .and_then(|v| v.get("model"))
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string();
+    if cur.is_empty() {
+        let mut wake = data
+            .get("wake")
+            .and_then(|v| v.as_object())
+            .cloned()
+            .unwrap_or_default();
+        wake.insert("model".into(), serde_json::Value::String(id.into()));
+        data.insert("wake".into(), serde_json::Value::Object(wake));
+        if let Ok(t) = serde_json::to_string_pretty(&data) {
+            let _ = std::fs::write(&path, t + "\n");
+        }
+        // Re-read for the return (phrase override may also live there).
+        return effective_wake_model(home);
+    }
+    effective_wake_model(home)
+}
+
+/// Effective (id, phrase) after merges: file wins, else registry default.
+pub fn effective_wake_model(home: &Path) -> (String, String) {
+    let data: serde_json::Map<String, serde_json::Value> =
+        std::fs::read_to_string(home.join("configs/voice.json"))
+            .ok()
+            .and_then(|t| serde_json::from_str(&t).ok())
+            .unwrap_or_default();
+    let id = data
+        .get("wake")
+        .and_then(|v| v.get("model"))
+        .and_then(|v| v.as_str())
+        .filter(|s| !s.is_empty())
+        .unwrap_or("hey_jarvis")
+        .to_string();
+    if let Some(p) = data
+        .get("wake")
+        .and_then(|v| v.get("phrase"))
+        .and_then(|v| v.as_str())
+        .filter(|s| !s.is_empty())
+    {
+        return (id, p.to_string());
+    }
+    if let Some(m) = wake_registry(home).into_iter().find(|m| m.id == id) {
+        if !m.phrase.is_empty() {
+            return (id, m.phrase);
+        }
+    }
+    (id.clone(), id.replace('_', " "))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -198,7 +198,42 @@ fn check_wake(home: &Path) -> Check {
         }
     }
     if missing.is_empty() && bad.is_empty() {
-        ok("wake", format!("{} files pinned-ok", files.len()))
+        // Configured classifier (wake.model): pinned entries get a sha
+        // check, custom ids just need the file in the cache dir.
+        let (id, _) = crate::render::effective_wake_model(home);
+        let reg = crate::render::wake_registry(home)
+            .into_iter()
+            .find(|m| m.id == id);
+        let file = reg
+            .as_ref()
+            .map(|m| m.file.clone())
+            .filter(|s| !s.is_empty())
+            .unwrap_or_else(|| format!("{id}_v0.1.onnx"));
+        let p = dir.join(&file);
+        if !p.is_file() {
+            return fail(
+                "wake",
+                format!("model {id} missing: {file} not in cache (run `setup init`)"),
+            );
+        }
+        if let Some(m) = reg.filter(|m| !m.sha256.is_empty()) {
+            match sha256sum(&p) {
+                Some(got) if got == m.sha256 => {}
+                Some(got) => {
+                    return fail(
+                        "wake",
+                        format!("model {id} corrupt: {file} (got {got:.12}…)"),
+                    );
+                }
+                None => {
+                    return fail("wake", format!("model {id}: sha256sum unavailable"));
+                }
+            }
+        }
+        ok(
+            "wake",
+            format!("{} files pinned-ok, model {id}", files.len()),
+        )
     } else {
         let mut d = vec![];
         if !missing.is_empty() {

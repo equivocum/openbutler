@@ -180,6 +180,46 @@ fn fetch_wake(home: &Path, lines: &mut std::io::Lines<std::io::StdinLock<'_>>, y
             }
         }
     }
+    // Configured classifier (wake.model): fetch when the registry pins it
+    // and the cache lacks it. Custom (unpinned) ids must be placed by hand.
+    {
+        let (id, _) = crate::render::effective_wake_model(home);
+        if let Some(m) = crate::render::wake_registry(home)
+            .into_iter()
+            .find(|m| m.id == id)
+        {
+            if !m.file.is_empty() && !dir.join(&m.file).is_file() {
+                let go = yes
+                    || confirm(
+                        lines,
+                        &format!(
+                            "wake model {id} missing — download {} (~{}MB)",
+                            m.file,
+                            m.bytes / 1_000_000
+                        ),
+                        true,
+                    );
+                if !go {
+                    println!("wake model {id}: skipped (wake-word mode degrades without it).");
+                    return true;
+                }
+                let url = format!("{base}/{}", m.file);
+                let dest = dir.join(&m.file);
+                print!("fetching {}... ", m.file);
+                let _ = std::io::stdout().flush();
+                match std::process::Command::new("curl")
+                    .args(["-sSL", &url, "-o", &dest.to_string_lossy()])
+                    .output()
+                {
+                    Ok(o) if o.status.success() && dest.is_file() => println!("ok"),
+                    _ => {
+                        println!("FAILED ({url})");
+                        ok = false;
+                    }
+                }
+            }
+        }
+    }
     ok
 }
 
@@ -325,6 +365,25 @@ pub fn run(home: &Path, yes: bool) -> i32 {
     println!("wrote {}", home.join(".env").display());
     if !run_render(home, &vals) {
         return 1;
+    }
+    // Wake word follows the assistant's name when a stock classifier
+    // says it; otherwise the default stands (custom names need a
+    // trained classifier — see README).
+    {
+        let agent = vals.get("AGENT_NAME").map(|s| s.as_str()).unwrap_or("");
+        if let Some(m) = crate::render::derive_wake_model(home, agent) {
+            let (id, phrase) = crate::render::ensure_wake_model(home, &m.id);
+            println!("wake word: \"{phrase}\" (model {id}).");
+        } else {
+            let (id, phrase) = crate::render::effective_wake_model(home);
+            if agent.is_empty() {
+                println!("wake word: \"{phrase}\" (model {id}).");
+            } else {
+                println!(
+                    "wake word: \"{phrase}\" (model {id}) — no stock classifier says \"{agent}\"; switch anytime with `voice config set wake.model <id>`."
+                );
+            }
+        }
     }
     if !fetch_wake(home, &mut lines, yes) {
         return 1;

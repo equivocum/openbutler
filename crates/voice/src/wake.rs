@@ -10,8 +10,57 @@
 // is deferred work, not needed for Phase 7.
 
 use std::io::{BufRead, Write};
+use std::path::Path;
+
+use serde_json::Value;
 
 const TICK_SAMPLES: usize = 1280; // 80ms @16k — openWakeWord's cadence
+
+/// Underscored model id -> spoken phrase ("hey_jarvis" -> "hey jarvis").
+pub fn phrase_for(model: &str) -> String {
+    model.replace('_', " ")
+}
+
+/// Resolve the wake config to (model id, classifier file, spoken phrase):
+/// `wake.model` names a models/wake.json registry entry (default
+/// "hey_jarvis"); unknown ids fall back to `<id>_v0.1.onnx` so
+/// custom-trained classifiers work by filename. `wake.phrase` overrides
+/// the spoken phrase for custom models.
+pub fn resolve(home: &Path, cfg: &serde_json::Map<String, Value>) -> (String, String, String) {
+    let wake = cfg.get("wake");
+    let model = wake
+        .and_then(|v| v.get("model"))
+        .and_then(|v| v.as_str())
+        .filter(|s| !s.is_empty())
+        .unwrap_or("hey_jarvis")
+        .to_string();
+    let pins = home.join("models/wake.json");
+    let (mut file, mut phrase) = (format!("{model}_v0.1.onnx"), phrase_for(&model));
+    if let Ok(t) = std::fs::read_to_string(&pins) {
+        if let Ok(serde_json::Value::Object(o)) = serde_json::from_str(&t) {
+            if let Some(m) = o
+                .get("models")
+                .and_then(|v| v.as_object())
+                .and_then(|m| m.get(&model))
+            {
+                if let Some(f) = m.get("file").and_then(|v| v.as_str()) {
+                    file = f.to_string();
+                }
+                if let Some(p) = m.get("phrase").and_then(|v| v.as_str()) {
+                    phrase = p.to_string();
+                }
+            }
+        }
+    }
+    if let Some(p) = wake
+        .and_then(|v| v.get("phrase"))
+        .and_then(|v| v.as_str())
+        .filter(|s| !s.is_empty())
+    {
+        phrase = p.to_string();
+    }
+    (model, file, phrase)
+}
 
 fn find_stts_bin() -> Result<std::path::PathBuf, String> {
     if let Ok(b) = std::env::var("OPENBUTLER_TTS_BIN").or_else(|_| std::env::var("JARVIS_STTS_BIN"))
@@ -39,19 +88,39 @@ struct WakeChild {
 
 pub struct WakeServe {
     bin: std::path::PathBuf,
+    model_file: String,
+    pub phrase: String,
     child: Option<WakeChild>,
     next_id: u64,
     pub unavailable: bool,
 }
 
 impl WakeServe {
-    pub fn new() -> Result<Self, String> {
+    pub fn new(home: &Path, cfg: &serde_json::Map<String, Value>) -> Result<Self, String> {
+        let (_, file, phrase) = resolve(home, cfg);
+        Self::from_parts(file, phrase)
+    }
+
+    pub fn from_parts(model_file: String, phrase: String) -> Result<Self, String> {
         Ok(Self {
             bin: find_stts_bin()?,
+            model_file,
+            phrase,
             child: None,
             next_id: 0,
             unavailable: false,
         })
+    }
+
+    /// Switch models live: drops the serve child so the next tick loads
+    /// the new classifier (buffers restart — safer than carryover).
+    pub fn set_model(&mut self, home: &Path, cfg: &serde_json::Map<String, Value>) {
+        let (_, file, phrase) = resolve(home, cfg);
+        if file != self.model_file {
+            self.model_file = file;
+            self.phrase = phrase;
+            self.kill();
+        }
     }
 
     fn ensure(&mut self) -> Result<(), String> {
@@ -116,8 +185,9 @@ impl WakeServe {
         self.next_id += 1;
         let id = self.next_id;
         let bytes: Vec<u8> = samples.iter().flat_map(|s| s.to_le_bytes()).collect();
+        let file = self.model_file.clone();
         let rep = self.request(serde_json::json!({
-            "id": id, "cmd": "wake",
+            "id": id, "cmd": "wake", "model_file": file,
             "pcm_b64": base64::engine::general_purpose::STANDARD.encode(&bytes),
         }))?;
         if rep.get("ok").and_then(|x| x.as_bool()).unwrap_or(false) {
@@ -162,5 +232,49 @@ mod tests {
         // 1280 i16 samples = 2560 bytes -> base64 ceil(2560/3)*4 = 3416.
         assert_eq!(b64.len(), 3416);
         assert!(b64.starts_with("AAAB"));
+    }
+
+    #[test]
+    fn phrase_derives_from_model_id() {
+        assert_eq!(phrase_for("hey_jarvis"), "hey jarvis");
+        assert_eq!(phrase_for("alexa"), "alexa");
+    }
+
+    #[test]
+    fn resolve_defaults_without_registry() {
+        let home = std::env::temp_dir().join(format!("ob-wakeres-{}", std::process::id()));
+        let _ = std::fs::create_dir_all(&home);
+        let cfg = serde_json::Map::new();
+        let (model, file, phrase) = resolve(&home, &cfg);
+        assert_eq!(model, "hey_jarvis");
+        assert_eq!(file, "hey_jarvis_v0.1.onnx");
+        assert_eq!(phrase, "hey jarvis");
+        let _ = std::fs::remove_dir_all(&home);
+    }
+
+    #[test]
+    fn resolve_uses_registry_and_phrase_override() {
+        let home = std::env::temp_dir().join(format!("ob-wakeres2-{}", std::process::id()));
+        let _ = std::fs::create_dir_all(home.join("models"));
+        std::fs::write(
+            home.join("models/wake.json"),
+            r#"{"models": {"alexa": {"file": "alexa_v0.1.onnx", "phrase": "alexa"}}}"#,
+        )
+        .unwrap();
+        let mut w = serde_json::Map::new();
+        w.insert("wake".into(), serde_json::json!({"model": "alexa"}));
+        let (model, file, phrase) = resolve(&home, &w);
+        assert_eq!(
+            (model.as_str(), file.as_str(), phrase.as_str()),
+            ("alexa", "alexa_v0.1.onnx", "alexa")
+        );
+        w.insert(
+            "wake".into(),
+            serde_json::json!({"model": "custom_x", "phrase": "hey custom"}),
+        );
+        let (_, file, phrase) = resolve(&home, &w);
+        assert_eq!(file, "custom_x_v0.1.onnx");
+        assert_eq!(phrase, "hey custom");
+        let _ = std::fs::remove_dir_all(&home);
     }
 }
