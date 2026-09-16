@@ -154,9 +154,8 @@ fn render_board(home: &Path, vars: &BTreeMap<String, String>) -> (PathBuf, Strin
     )
 }
 
-/* Render all three configs. Refuses when a live file exists but is not
-valid JSON: rebuilding it from the template would wipe custom keys, so
-quarantine first (`setup fix`). Returns the relative paths written. */
+// Renders all three configs. Refuses when a live file exists but is not
+// valid JSON — rebuilding it from the template would wipe custom keys.
 pub fn render_all(home: &Path, vars: &BTreeMap<String, String>) -> Result<Vec<String>, String> {
     for rel in [
         "configs/voice.json",

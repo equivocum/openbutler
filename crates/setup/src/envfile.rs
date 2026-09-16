@@ -108,8 +108,7 @@ mod tests {
         assert!(t.find("AGENT_NAME").unwrap() < t.find("CUSTOM_X").unwrap());
     }
 
-    /* The human template must agree with the const single-home, or fresh
-    installs seeded by hand drift from every other consumer. */
+    // The human template must agree with the const single-home.
     #[test]
     fn template_matches_shared_defaults() {
         use openbutler_common::settings as S;

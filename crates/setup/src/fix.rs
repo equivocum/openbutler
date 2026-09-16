@@ -109,7 +109,7 @@ pub fn run(home: &Path) -> i32 {
         }
     }
 
-    // 2. Unwired override.json.
+    // 3. Unwired override.json.
     {
         let p = home.join("configs/override.json");
         let q = home.join("configs/override.json.unwired");
@@ -132,7 +132,7 @@ pub fn run(home: &Path) -> i32 {
         }
     }
 
-    // 3. Template-vs-live display.
+    // 4. Template-vs-live display.
     {
         let live = openbutler_setup::envfile::load(home);
         let example = std::fs::read_to_string(home.join(".env.example"))

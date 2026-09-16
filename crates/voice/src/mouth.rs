@@ -844,10 +844,9 @@ fn elevenlabs_synth(text: &str, el: &ElevenLabsCfg) -> Result<(u32, Vec<i16>), S
     Ok((EL_RATE, pcm))
 }
 
-/* Prefetched audio may replay only for the exact sentence + generation it
-was synthed for: batch-merging appends text the audio doesn't cover, and
-a barge-in revokes the generation. Anything else synthesizes fresh, so
-every queued sentence is heard. */
+// Prefetched audio may replay only for the exact sentence + generation it
+// was synthed for; anything else synthesizes fresh, so every queued
+// sentence is heard.
 fn pipeline_usable(stashed: Option<(u64, &str)>, gen: u64, sentence: &str) -> bool {
     match stashed {
         Some((sg, stext)) => sg == gen && stext == sentence,
@@ -870,12 +869,7 @@ fn worker_loop(
     let mut pump_rate: u32 = 0;
     let mut stashed: Option<(u64, String, Option<Vec<String>>)> = None;
     let mut next_synth: Option<std::thread::JoinHandle<Option<(u32, Vec<i16>)>>> = None;
-    /* Prefetched audio tagged with the exact sentence + generation it was
-    synthed for. The consumer may batch-merge further sentences into the
-    current text, or a barge-in may bump the generation mid-drain — in
-    either case the stash no longer matches and must be discarded, or
-    merged-away sentences play truncated/stale audio (or leak across
-    turns). pipeline_usable enforces the match. */
+    // Identity-tagged prefetch audio; pipeline_usable enforces the match.
     let mut stashed_audio: Option<(u64, String, u32, Vec<i16>)> = None;
     loop {
         let (g, sentence, directions) = match stashed.take() {
@@ -1073,10 +1067,7 @@ fn worker_loop(
                 }
             }
         }
-        // Pipeline result: join the background synth handle that was
-        // spawned during drain. Audio is stashed tagged with the exact
-        // sentence + generation it was synthed for; the consumer replays
-        // it only on an exact match (see pipeline_usable).
+        // Join the background synth; stash tagged for pipeline_usable.
         if let Some(h) = next_synth.take() {
             let joined = h.join().ok().flatten();
             if let Some((ng, nsent, ndirs)) = next_prefetch {

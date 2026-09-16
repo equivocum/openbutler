@@ -1,15 +1,12 @@
-/* Shared settings core: ONE registry, ONE validator, ONE router for every
-config CLI (`openbutler config`, `voice config`) so the two can never
-disagree. Covers voice.json (+ nested wake.*), face.json (face.*),
-board.json (board.*). `.env` sync + re-render live one layer up. */
+// Shared settings core: one registry, validator, and router for every
+// config CLI, so `openbutler config` and `voice config` can never disagree.
+// `.env` sync + re-render live one layer up, not here.
 
 use std::path::{Path, PathBuf};
 
-/* Single home for every user-facing default: identity seeds, tuning
-fallbacks, server ports. Voice, face, board, setup, and the CLI all
-reference these consts — never retype the literal, so audit means
-reading this block. Runtime-internal values (model ids, filter chains,
-compute modes, paths) stay at their use sites. */
+// Single home for every user-facing default. All binaries reference these
+// consts — never retype the literal. Runtime-internal values stay at their
+// use sites.
 pub const DEFAULT_NAME: &str = "Assistant";
 pub const DEFAULT_VOICE_CONTAINER: &str = "openbutler";
 pub const DEFAULT_FACE_PORT: u16 = 8790;
@@ -28,9 +25,8 @@ pub const DEFAULT_WAKE_ATTENTION_S: f64 = 8.0;
 pub const DEFAULT_UPSTREAM_ORG: &str = "your-org";
 pub const DEFAULT_COPYRIGHT_HOLDER: &str = "Your Name";
 
-/* The one dynamic default: the vault lives next to the home, never inside.
-Template keeps it unexpanded (`$HOME/openbutler-vault`); the sync-test
-pins that spelling. */
+// The one dynamic default: the vault lives next to the home, never inside.
+// The template keeps it unexpanded; the sync-test pins that spelling.
 pub fn default_memory_vault() -> String {
     format!(
         "{}/openbutler-vault",
@@ -243,9 +239,9 @@ pub fn setting_path(home: &Path, key: &str) -> PathBuf {
     }
 }
 
-/* Strict file mutation shared by every writer: a missing file starts empty,
-but an unparsable or unwritable file is an Err — never silently rebuilt,
-since that would wipe every other setting. */
+// Strict file mutation shared by every writer: a missing file starts empty,
+// but an unparsable or unwritable file is an Err — never silently rebuilt,
+// since that would wipe every other setting.
 pub fn modify_file(
     path: &Path,
     mutate: impl FnOnce(&mut serde_json::Map<String, serde_json::Value>),
@@ -276,10 +272,9 @@ pub fn modify_file(
     .map_err(|e| format!("write {}: {e} — no changes made", path.display()))
 }
 
-/* File-only write of one dotted key: voice honors one nesting level
-(`wake.threshold`), face/board strip their prefix (`face.port` → `port`).
-Voice sessions use write_setting below, which additionally updates the
-in-memory map; the CLI calls this directly. */
+// File-only write of one dotted key: voice honors one nesting level,
+// face/board strip their prefix. Voice sessions use write_setting, which
+// additionally updates the in-memory map; the CLI calls this directly.
 pub fn write_dotted_key(home: &Path, dotted: &str, value: serde_json::Value) -> Result<(), String> {
     let path = setting_path(home, dotted);
     let (head, tail): (String, Option<String>) = match setting_file(dotted) {
@@ -414,10 +409,9 @@ pub fn get_setting(
     }
 }
 
-/* Display defaults for `config get` when neither file nor `.env` seed sets a
-value. The runtime merges are authoritative — voice `config.rs`, face and
-board server defaults — so keep this table in sync with those on change;
-a light crate cannot import the heavy servers to derive them. */
+// Display defaults for `config get` when neither file nor `.env` seed sets a
+// value. The runtime merges stay authoritative, so keep this table in sync
+// with them; a light crate cannot import the heavy servers to derive them.
 pub fn default_value(key: &str) -> serde_json::Value {
     match key {
         "speed" => serde_json::json!(DEFAULT_SPEED),
