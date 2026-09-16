@@ -1,6 +1,7 @@
 // Interactive first-use walk: identity -> .env -> render -> models.
 // `--yes` takes current .env (or template defaults) with no prompts.
 
+use openbutler_common::settings as S;
 use std::collections::BTreeMap;
 use std::io::{BufRead, Write};
 use std::path::Path;
@@ -232,26 +233,20 @@ pub fn run(home: &Path, yes: bool) -> i32 {
     let mut vals: BTreeMap<String, String> = if yes {
         let mut v = cur.clone();
         for (k, d) in [
-            ("AGENT_NAME", "Assistant"),
-            ("VOICE_CONTAINER", "openbutler"),
-            ("FACE_PORT", "8790"),
-            ("HANDS_PORT", "8794"),
-            ("FACE_NAME", "board"),
-            ("VOICE_NAME", "bm_lewis"),
-            ("STT_MODEL", "small.en"),
-            ("UPSTREAM_ORG", "your-org"),
-            ("COPYRIGHT_HOLDER", "Your Name"),
+            ("AGENT_NAME", S::DEFAULT_NAME.to_string()),
+            ("VOICE_CONTAINER", S::DEFAULT_VOICE_CONTAINER.to_string()),
+            ("FACE_PORT", S::DEFAULT_FACE_PORT.to_string()),
+            ("HANDS_PORT", S::DEFAULT_BOARD_PORT.to_string()),
+            ("FACE_NAME", S::DEFAULT_FACE_ID.to_string()),
+            ("VOICE_NAME", S::DEFAULT_VOICE_NAME.to_string()),
+            ("STT_MODEL", S::DEFAULT_STT_MODEL.to_string()),
+            ("UPSTREAM_ORG", S::DEFAULT_UPSTREAM_ORG.to_string()),
+            ("COPYRIGHT_HOLDER", S::DEFAULT_COPYRIGHT_HOLDER.to_string()),
         ] {
             v.entry(k.into()).or_insert_with(|| d.into());
         }
         if !v.contains_key("MEMORY_VAULT") {
-            v.insert(
-                "MEMORY_VAULT".into(),
-                format!(
-                    "{}/openbutler-vault",
-                    std::env::var("HOME").unwrap_or_else(|_| "~".into())
-                ),
-            );
+            v.insert("MEMORY_VAULT".into(), S::default_memory_vault());
         }
         v
     } else {
@@ -265,7 +260,7 @@ pub fn run(home: &Path, yes: bool) -> i32 {
             prompt(
                 &mut lines,
                 "Agent name (greetings, quit phrases)",
-                &get("AGENT_NAME", "Assistant"),
+                &get("AGENT_NAME", S::DEFAULT_NAME),
             ),
         );
         v.insert(
@@ -273,13 +268,7 @@ pub fn run(home: &Path, yes: bool) -> i32 {
             prompt(
                 &mut lines,
                 "Memory vault path (Obsidian folder)",
-                &get(
-                    "MEMORY_VAULT",
-                    &format!(
-                        "{}/openbutler-vault",
-                        std::env::var("HOME").unwrap_or_else(|_| "~".into())
-                    ),
-                ),
+                &get("MEMORY_VAULT", &S::default_memory_vault()),
             ),
         );
         v.insert(
@@ -287,7 +276,7 @@ pub fn run(home: &Path, yes: bool) -> i32 {
             prompt(
                 &mut lines,
                 "Toolbox container for builds",
-                &get("VOICE_CONTAINER", "openbutler"),
+                &get("VOICE_CONTAINER", S::DEFAULT_VOICE_CONTAINER),
             ),
         );
         v.insert(
@@ -295,7 +284,7 @@ pub fn run(home: &Path, yes: bool) -> i32 {
             prompt(
                 &mut lines,
                 "Face port (127.0.0.1)",
-                &get("FACE_PORT", "8790"),
+                &get("FACE_PORT", &S::DEFAULT_FACE_PORT.to_string()),
             ),
         );
         v.insert(
@@ -303,7 +292,7 @@ pub fn run(home: &Path, yes: bool) -> i32 {
             prompt(
                 &mut lines,
                 "Board port (127.0.0.1)",
-                &get("HANDS_PORT", "8794"),
+                &get("HANDS_PORT", &S::DEFAULT_BOARD_PORT.to_string()),
             ),
         );
         v.insert(
@@ -311,7 +300,7 @@ pub fn run(home: &Path, yes: bool) -> i32 {
             prompt(
                 &mut lines,
                 "Face (board/neural/radial/rain)",
-                &get("FACE_NAME", "board"),
+                &get("FACE_NAME", S::DEFAULT_FACE_ID),
             ),
         );
         v.insert(
@@ -319,7 +308,7 @@ pub fn run(home: &Path, yes: bool) -> i32 {
             prompt(
                 &mut lines,
                 "Voice (e.g. bm_lewis)",
-                &get("VOICE_NAME", "bm_lewis"),
+                &get("VOICE_NAME", S::DEFAULT_VOICE_NAME),
             ),
         );
         v.insert(
@@ -327,7 +316,7 @@ pub fn run(home: &Path, yes: bool) -> i32 {
             prompt(
                 &mut lines,
                 "STT model (small.en/medium.en)",
-                &get("STT_MODEL", "small.en"),
+                &get("STT_MODEL", S::DEFAULT_STT_MODEL),
             ),
         );
         // Preserve white-label + any custom keys untouched.
@@ -397,7 +386,7 @@ pub fn run(home: &Path, yes: bool) -> i32 {
         "  toolbox run -c {} {}/toolbox-setup.sh",
         vals.get("VOICE_CONTAINER")
             .map(|s| s.as_str())
-            .unwrap_or("openbutler"),
+            .unwrap_or(S::DEFAULT_VOICE_CONTAINER),
         home.display()
     );
     println!("  cargo build   (heavy crates: build inside that container)");

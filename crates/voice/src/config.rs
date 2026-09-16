@@ -27,20 +27,38 @@ fn elevenlabs_default() -> Value {
 fn defaults() -> Map<String, Value> {
     let mut m = Map::new();
     m.insert("agent_dir".into(), Value::String("~".into()));
-    m.insert("name".into(), Value::String("Assistant".into()));
+    m.insert(
+        "name".into(),
+        Value::String(C::settings::DEFAULT_NAME.into()),
+    );
     m.insert("model".into(), Value::String("claude-sonnet-5".into()));
     m.insert("deep_model".into(), Value::String("claude-opus-5".into()));
     m.insert("permission_mode".into(), Value::String("ask".into()));
     m.insert("visible_skills".into(), Value::Null);
     m.insert("extra_dirs".into(), Value::Array(vec![]));
     m.insert("ptt_key".into(), Value::String("home".into()));
-    m.insert("mic_mode".into(), Value::String("open".into()));
-    m.insert("speed".into(), serde_json::json!(1.0));
+    m.insert(
+        "mic_mode".into(),
+        Value::String(C::settings::DEFAULT_MIC_MODE.into()),
+    );
+    m.insert(
+        "speed".into(),
+        serde_json::json!(C::settings::DEFAULT_SPEED),
+    );
     m.insert("resume_last_session".into(), Value::Bool(false));
     m.insert("show_usage".into(), Value::Bool(false));
-    m.insert("effort".into(), Value::String(String::new()));
-    m.insert("voice".into(), Value::String("bm_lewis".into()));
-    m.insert("stt_model".into(), Value::String("small.en".into()));
+    m.insert(
+        "effort".into(),
+        Value::String(C::settings::DEFAULT_EFFORT.into()),
+    );
+    m.insert(
+        "voice".into(),
+        Value::String(C::settings::DEFAULT_VOICE_NAME.into()),
+    );
+    m.insert(
+        "stt_model".into(),
+        Value::String(C::settings::DEFAULT_STT_MODEL.into()),
+    );
     m.insert("stt_device".into(), Value::String("auto".into()));
     m.insert("stt_compute".into(), Value::String("int8".into()));
     m.insert("filter_hallucinations".into(), Value::Bool(true));
@@ -54,7 +72,7 @@ fn defaults() -> Map<String, Value> {
     );
     m.insert(
         "greeting".into(),
-        Value::String("Voice line online. Talk to me.".into()),
+        Value::String(C::settings::DEFAULT_GREETING.into()),
     );
     m.insert("greeting_open_mic".into(), Value::String(String::new()));
     m.insert(
@@ -66,10 +84,22 @@ fn defaults() -> Map<String, Value> {
     // "hey jarvis" gating. Appended last so the Python-shared key order
     // above is untouched.
     let mut wake = Map::new();
-    wake.insert("model".into(), Value::String("hey_jarvis".into()));
-    wake.insert("threshold".into(), serde_json::json!(0.5));
-    wake.insert("patience".into(), serde_json::json!(2));
-    wake.insert("attention_s".into(), serde_json::json!(8.0));
+    wake.insert(
+        "model".into(),
+        Value::String(C::settings::DEFAULT_WAKE_MODEL.into()),
+    );
+    wake.insert(
+        "threshold".into(),
+        serde_json::json!(C::settings::DEFAULT_WAKE_THRESHOLD),
+    );
+    wake.insert(
+        "patience".into(),
+        serde_json::json!(C::settings::DEFAULT_WAKE_PATIENCE),
+    );
+    wake.insert(
+        "attention_s".into(),
+        serde_json::json!(C::settings::DEFAULT_WAKE_ATTENTION_S),
+    );
     m.insert("wake".into(), Value::Object(wake));
     m
 }
@@ -130,7 +160,7 @@ pub fn load(home: &Path) -> Map<String, Value> {
         }
     }
     if let Ok(v) = std::env::var("AGENT_NAME") {
-        if !v.is_empty() && ["Assistant", "", "Assistant"].contains(&get_str(&cfg, "name")) {
+        if !v.is_empty() && ["", C::settings::DEFAULT_NAME].contains(&get_str(&cfg, "name")) {
             cfg.insert("name".into(), Value::String(v));
         }
     }
@@ -159,12 +189,15 @@ pub fn load(home: &Path) -> Map<String, Value> {
         }
     }
     if let Ok(v) = std::env::var("VOICE_NAME") {
-        if !v.is_empty() && ["", "bm_lewis"].contains(&get_str(&cfg, "voice")) {
+        if !v.is_empty() && ["", C::settings::DEFAULT_VOICE_NAME].contains(&get_str(&cfg, "voice"))
+        {
             cfg.insert("voice".into(), Value::String(v));
         }
     }
     if let Ok(v) = std::env::var("STT_MODEL") {
-        if !v.is_empty() && ["", "small.en"].contains(&get_str(&cfg, "stt_model")) {
+        if !v.is_empty()
+            && ["", C::settings::DEFAULT_STT_MODEL].contains(&get_str(&cfg, "stt_model"))
+        {
             cfg.insert("stt_model".into(), Value::String(v));
         }
     }

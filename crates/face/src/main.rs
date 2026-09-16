@@ -45,13 +45,13 @@ fn str_field(obj: &Map<String, Value>, key: &str, dflt: &str) -> String {
 fn load_config(path: &Path, home: &Path) -> FaceCfg {
     let user = C::read_json_object(path);
     let has = |k: &str| user.contains_key(k);
-    let mut name = str_field(&user, "name", "Assistant");
-    let mut face = str_field(&user, "face", "board");
+    let mut name = str_field(&user, "name", C::settings::DEFAULT_NAME);
+    let mut face = str_field(&user, "face", C::settings::DEFAULT_FACE_ID);
     let mut port: u16 = user
         .get("port")
         .and_then(|v| v.as_u64())
         .and_then(|n| u16::try_from(n).ok())
-        .unwrap_or(8790);
+        .unwrap_or(C::settings::DEFAULT_FACE_PORT);
     if !has("name") {
         if let Ok(v) = std::env::var("AGENT_NAME") {
             if !v.is_empty() {

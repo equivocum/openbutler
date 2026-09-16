@@ -94,6 +94,19 @@ pub fn json_has_key(path: &Path, key: &str) -> bool {
     read_json_object(path).contains_key(key)
 }
 
+/// Strict shape check: the file must exist and parse as a JSON object.
+/// Lenient readers (`read_json_object`) fold missing AND broken into empty;
+/// repair paths use this to tell the two apart.
+pub fn is_json_object(path: &Path) -> bool {
+    match std::fs::read_to_string(path) {
+        Ok(t) => matches!(
+            serde_json::from_str::<serde_json::Value>(&t),
+            Ok(serde_json::Value::Object(_))
+        ),
+        Err(_) => false,
+    }
+}
+
 /// Minimal mime table covering everything the face/board static trees serve.
 /// (Python uses mimetypes.guess_type; these are the types it yields for our
 /// extensions on a standard Linux install.)

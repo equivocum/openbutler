@@ -153,7 +153,7 @@ fn check_stt(home: &Path) -> Check {
     let model = cfg
         .get("stt_model")
         .and_then(|v| v.as_str())
-        .unwrap_or("small.en");
+        .unwrap_or(openbutler_common::settings::DEFAULT_STT_MODEL);
     let hub = std::env::var("HF_HUB_CACHE")
         .map(std::path::PathBuf::from)
         .unwrap_or_else(|_| home_dir().join(".cache/huggingface/hub"));
@@ -309,7 +309,7 @@ fn check_toolbox(home: &Path) -> Check {
     let c = vars
         .get("VOICE_CONTAINER")
         .cloned()
-        .unwrap_or_else(|| "openbutler".into());
+        .unwrap_or_else(|| openbutler_common::settings::DEFAULT_VOICE_CONTAINER.into());
     match sh("toolbox", &["list", "--containers"]) {
         Some(o) if o.contains(&c) => ok("toolbox", format!("container {c} present")),
         Some(_) => fail(

@@ -107,4 +107,31 @@ mod tests {
         assert!(t.contains("AGENT_HOME=\"$(cd"));
         assert!(t.find("AGENT_NAME").unwrap() < t.find("CUSTOM_X").unwrap());
     }
+
+    /* The human template must agree with the const single-home, or fresh
+    installs seeded by hand drift from every other consumer. */
+    #[test]
+    fn template_matches_shared_defaults() {
+        use openbutler_common::settings as S;
+        let t = std::fs::read_to_string(
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../.env.example"),
+        )
+        .unwrap();
+        let m = parse(&t);
+        let get = |k: &str| m.get(k).cloned().unwrap_or_default();
+        assert_eq!(get("AGENT_NAME"), S::DEFAULT_NAME);
+        assert_eq!(get("VOICE_CONTAINER"), S::DEFAULT_VOICE_CONTAINER);
+        assert_eq!(get("FACE_PORT"), S::DEFAULT_FACE_PORT.to_string());
+        assert_eq!(get("HANDS_PORT"), S::DEFAULT_BOARD_PORT.to_string());
+        assert_eq!(get("FACE_NAME"), S::DEFAULT_FACE_ID);
+        assert_eq!(get("VOICE_NAME"), S::DEFAULT_VOICE_NAME);
+        assert_eq!(get("STT_MODEL"), S::DEFAULT_STT_MODEL);
+        assert_eq!(get("GREETING"), S::DEFAULT_GREETING);
+        assert_eq!(get("UPSTREAM_ORG"), S::DEFAULT_UPSTREAM_ORG);
+        assert_eq!(get("COPYRIGHT_HOLDER"), S::DEFAULT_COPYRIGHT_HOLDER);
+        assert_eq!(
+            openbutler_common::expand(&get("MEMORY_VAULT")),
+            S::default_memory_vault()
+        );
+    }
 }

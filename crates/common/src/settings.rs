@@ -5,6 +5,39 @@ board.json (board.*). `.env` sync + re-render live one layer up. */
 
 use std::path::{Path, PathBuf};
 
+/* Single home for every user-facing default: identity seeds, tuning
+fallbacks, server ports. Voice, face, board, setup, and the CLI all
+reference these consts — never retype the literal, so audit means
+reading this block. Runtime-internal values (model ids, filter chains,
+compute modes, paths) stay at their use sites. */
+pub const DEFAULT_NAME: &str = "Assistant";
+pub const DEFAULT_VOICE_CONTAINER: &str = "openbutler";
+pub const DEFAULT_FACE_PORT: u16 = 8790;
+pub const DEFAULT_BOARD_PORT: u16 = 8794;
+pub const DEFAULT_FACE_ID: &str = "board";
+pub const DEFAULT_VOICE_NAME: &str = "bm_lewis";
+pub const DEFAULT_STT_MODEL: &str = "small.en";
+pub const DEFAULT_GREETING: &str = "Hey, good to see you. What are we working on?";
+pub const DEFAULT_MIC_MODE: &str = "open";
+pub const DEFAULT_SPEED: f64 = 1.0;
+pub const DEFAULT_EFFORT: &str = "";
+pub const DEFAULT_WAKE_MODEL: &str = "hey_jarvis";
+pub const DEFAULT_WAKE_THRESHOLD: f64 = 0.5;
+pub const DEFAULT_WAKE_PATIENCE: u64 = 2;
+pub const DEFAULT_WAKE_ATTENTION_S: f64 = 8.0;
+pub const DEFAULT_UPSTREAM_ORG: &str = "your-org";
+pub const DEFAULT_COPYRIGHT_HOLDER: &str = "Your Name";
+
+/* The one dynamic default: the vault lives next to the home, never inside.
+Template keeps it unexpanded (`$HOME/openbutler-vault`); the sync-test
+pins that spelling. */
+pub fn default_memory_vault() -> String {
+    format!(
+        "{}/openbutler-vault",
+        std::env::var("HOME").unwrap_or_else(|_| "~".into())
+    )
+}
+
 #[derive(Clone, Copy)]
 pub enum SettingKind {
     RangedFloat(f32, f32),
@@ -387,19 +420,20 @@ board server defaults — so keep this table in sync with those on change;
 a light crate cannot import the heavy servers to derive them. */
 pub fn default_value(key: &str) -> serde_json::Value {
     match key {
-        "speed" => serde_json::json!(1.0),
-        "voice" => serde_json::json!("bm_lewis"),
-        "effort" => serde_json::json!(""),
-        "mic_mode" => serde_json::json!("open"),
-        "stt_model" => serde_json::json!("small.en"),
-        "face.name" | "board.name" => serde_json::json!("Assistant"),
-        "face.face" => serde_json::json!("board"),
-        "face.port" => serde_json::json!(8790),
-        "board.port" => serde_json::json!(8794),
-        "wake.model" => serde_json::json!("hey_jarvis"),
-        "wake.threshold" => serde_json::json!(0.5),
-        "wake.patience" => serde_json::json!(2),
-        "wake.attention_s" => serde_json::json!(8.0),
+        "speed" => serde_json::json!(DEFAULT_SPEED),
+        "voice" => serde_json::json!(DEFAULT_VOICE_NAME),
+        "effort" => serde_json::json!(DEFAULT_EFFORT),
+        "mic_mode" => serde_json::json!(DEFAULT_MIC_MODE),
+        "stt_model" => serde_json::json!(DEFAULT_STT_MODEL),
+        "greeting" => serde_json::json!(DEFAULT_GREETING),
+        "face.name" | "board.name" => serde_json::json!(DEFAULT_NAME),
+        "face.face" => serde_json::json!(DEFAULT_FACE_ID),
+        "face.port" => serde_json::json!(DEFAULT_FACE_PORT),
+        "board.port" => serde_json::json!(DEFAULT_BOARD_PORT),
+        "wake.model" => serde_json::json!(DEFAULT_WAKE_MODEL),
+        "wake.threshold" => serde_json::json!(DEFAULT_WAKE_THRESHOLD),
+        "wake.patience" => serde_json::json!(DEFAULT_WAKE_PATIENCE),
+        "wake.attention_s" => serde_json::json!(DEFAULT_WAKE_ATTENTION_S),
         _ => serde_json::Value::Null,
     }
 }
@@ -439,6 +473,10 @@ mod tests {
         assert_eq!(default_value("stt_model"), serde_json::json!("small.en"));
         assert_eq!(default_value("face.port"), serde_json::json!(8790));
         assert_eq!(default_value("wake.patience"), serde_json::json!(2));
+        assert_eq!(
+            default_value("greeting"),
+            serde_json::json!("Hey, good to see you. What are we working on?")
+        );
         assert_eq!(default_value("bogus"), serde_json::Value::Null);
     }
 
