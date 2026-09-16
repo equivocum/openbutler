@@ -1728,6 +1728,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "openbutler-cli"
+version = "0.1.0"
+dependencies = [
+ "openbutler-common",
+ "openbutler-setup",
+ "serde_json",
+]
+
+[[package]]
 name = "openbutler-common"
 version = "0.1.0"
 dependencies = [

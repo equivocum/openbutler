@@ -26,6 +26,7 @@ fn print_help() {
     println!("  config             print merged config as JSON");
     println!("  config get <key>   print one setting (dot paths: wake.threshold)");
     println!("  config set [key] [value]  interactive settings session (one flag at a time; Enter keeps)");
+    println!("  (every setting is also settable via `openbutler config set <key> <value>`)");
     println!("  brain \"MSG\"        run one opencode turn, streaming sentences");
     println!("    [--model M] [--session SID] [--effort low|medium|high|max]");
     println!("    [--perm ask|bypassPermissions]");

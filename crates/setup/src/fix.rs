@@ -27,7 +27,7 @@ pub fn run(home: &Path) -> i32 {
 
     // 1. GREETING wiring: .env GREETING -> voice.json greeting (render).
     {
-        let vars = crate::envfile::load(home);
+        let vars = openbutler_setup::envfile::load(home);
         if vars.contains_key("GREETING") {
             println!("GREETING: present in .env, wired to voice.json greeting (ok).");
         } else if confirm(
@@ -39,7 +39,7 @@ pub fn run(home: &Path) -> i32 {
                 "GREETING".into(),
                 "Hello, {name}. What are we working on today?".into(),
             );
-            match crate::envfile::write(home, &v) {
+            match openbutler_setup::envfile::write(home, &v) {
                 Ok(()) => {
                     println!("added GREETING.");
                     fixed += 1;
@@ -74,9 +74,9 @@ pub fn run(home: &Path) -> i32 {
 
     // 3. Template-vs-live display.
     {
-        let live = crate::envfile::load(home);
+        let live = openbutler_setup::envfile::load(home);
         let example = std::fs::read_to_string(home.join(".env.example"))
-            .map(|t| crate::envfile::parse(&t))
+            .map(|t| openbutler_setup::envfile::parse(&t))
             .unwrap_or_default();
         let mut shown = false;
         for k in [

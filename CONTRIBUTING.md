@@ -11,8 +11,8 @@
   `target/debug/build/intel-mkl-*` trees (no `mkl/latest`
   inside) are failed-install junk and safe to delete; a tree WITH
   `mkl/latest` is the good one — keep it.
-- Light crates (`common`, `face`, `board`, `setup`) build on the host:
-  `cargo build -p openbutler-common -p openbutler-face -p openbutler-board -p openbutler-setup`.
+- Light crates (`common`, `face`, `board`, `setup`, `cli`) build on the host:
+  `cargo build -p openbutler-common -p openbutler-face -p openbutler-board -p openbutler-setup -p openbutler-cli`.
 - `cargo fmt --check` must be clean workspace-wide.
 
 ## Run discipline
@@ -25,8 +25,10 @@
 
 ## Config discipline
 
-- Never hand-edit `configs/*.json`: change `.env` or use
-  `openbutler-voice config set`, then re-render (`setup init --yes`).
+- Never hand-edit `configs/*.json`: use `openbutler config set <key> <value>`
+  (writes the live JSON and keeps the `.env` seed in sync; `voice config set`
+  still works for tuning keys). Re-render after `.env` edits that render
+  owns (`setup init --yes`).
 - Templates (`configs/*.example`) stay generic; live files are gitignored.
 - Unknown keys in live files are preserved across renders; managed keys
   (`agent_dir`, `name`, `extra_dirs`, `board_state_dir`, `bus_dir`,
@@ -43,9 +45,18 @@
 
 ## Tests
 
-- `cargo test -p openbutler-voice -p openbutler-common` covers verbs,
-  fuzzy voice matching, settings validation, bus layout, render
-  round-trips. Keep them green; add regression tests with every fix.
+- Host (light): `cargo test -p openbutler-common -p openbutler-setup -p openbutler-cli`
+  covers settings validation/routing, `.env` + render round-trips, unified
+  `config` writes to both sides. Container (heavy):
+  `toolbox run -c <name> cargo test -p openbutler-voice -p openbutler-tts`
+  covers verbs, fuzzy voice matching, spoken-verb persistence. Keep them
+  green; add regression tests with every fix.
+- One settings core: registry, validation, and file routing live in
+  `crates/common/src/settings.rs`, shared by `openbutler config` and
+  `voice config` (thin re-exports in `voice/src/console.rs`). Add a
+  setting once, there. `setup` owns `.env` + render and exposes them as a
+  library for the `openbutler` CLI; runtime crates must never depend on it.
+- Comments: block comments on load-bearing invariants only, not every item.
 - Live gates before any release: real hands-free turns with latencies in
   `logs/voice.log`, interrupt + post-interrupt turn, quit phrase, clean
   shutdown with no orphaned `serve` children.

@@ -4,6 +4,11 @@
 
 use std::path::{Path, PathBuf};
 
+/// Shared settings core (registry, validation, file routing, reads/writes)
+/// for every config CLI — moved from `voice console.rs` so `voice config`
+/// and `openbutler config` can never disagree.
+pub mod settings;
+
 /// Locate the agent home: `--agent-home` value > $AGENT_HOME > walk up from
 /// the executable (or cwd) to the dir containing Cargo.toml (workspace root).
 pub fn agent_home(cli: Option<&str>) -> PathBuf {

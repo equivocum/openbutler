@@ -47,7 +47,7 @@ toolbox run -c openbutler ./toolbox-setup.sh
 # 2. Build — heavy crates INSIDE the container, light ones anywhere:
 toolbox run -c openbutler cargo build
 # Host-only alternative for the light crates:
-# cargo build -p openbutler-common -p openbutler-face -p openbutler-board -p openbutler-setup
+# cargo build -p openbutler-common -p openbutler-face -p openbutler-board -p openbutler-setup -p openbutler-cli
 
 # 3. First-use setup: identity Q&A -> .env -> rendered configs -> models:
 ./target/debug/openbutler-setup init
@@ -146,31 +146,44 @@ hands-free carries on.
 
 `openbutler-setup init` renders `configs/{voice,face,board}.json` from
 `.env`; re-render safely anytime (`init --yes` keeps tuning — managed keys
-only). Or tweak live:
+only). For day-to-day changes use the one settings CLI (takes effect on
+next launch; UPPER `.env` aliases like `STT_MODEL` work too):
 
 ```bash
-./target/debug/openbutler-voice config get speed
-./target/debug/openbutler-voice config set speed 1.1
-./target/debug/openbutler-voice config set voice af_heart
+./target/debug/openbutler config                # every setting, one list
+./target/debug/openbutler config get speed
+./target/debug/openbutler config set speed 1.1
+./target/debug/openbutler config set stt_model medium.en   # JSON + .env together
+./target/debug/openbutler config set name Butler           # .env + re-rendered JSONs
 ```
+
+`openbutler config set` writes the live JSON and keeps the `.env` seed in
+sync, so later re-renders stay drift-free. Editing `.env` by hand only
+seeds *missing* values — it never overwrites tuning you already set
+(`voice`, `stt_model`, `greeting`, faces, ports). `voice config get/set`
+still works as before for the tuning keys.
 
 | Key | What |
 |---|---|
+| `name` | assistant name (greetings, quit phrase, face/board titles) |
 | `voice` / `speed` (0.5–2.0) | TTS voice (54 built in) and rate |
 | `effort` | low / medium / high / max reasoning effort |
 | `mic_mode` | `open` hands-free (default), `ptt`, `wake` |
 | `stt_model` | e.g. `small.en`, `medium.en` (larger = slower, sharper) |
+| `greeting` / `memory_vault` / `voice_container` | spoken greeting, Obsidian vault dir, toolbox container for builds |
 | `wake.threshold` / `patience` / `attention_s` | wake sensitivity, confirmations, follow-up window |
 | `face.*` / `board.*` | `face.name`, `face.face`, `face.port`, `board.name`, `board.port` (ports validated 1–65535) |
 
 Spoken equivalents exist for the common ones ("go hands free", "wake word
-mode", "push to talk mode", "switch voice to …", "usage report"). `name`
-itself is set via `.env` + re-render (see above), not `config set`.
+mode", "push to talk mode", "switch voice to …", "usage report").
 
 ## Extend it
 
 - **New voice verbs**: add a matcher in `crates/voice/src/console.rs`
-  (`SETTINGS` for persisted settings, `console_match` for one-shots).
+  (`console_match` for one-shots).
+- **New settings**: extend the registry in `crates/common/src/settings.rs`
+  (shared by `openbutler config` and `voice config`, so add once) plus a
+  row in the `openbutler` CLI key table when the setting needs `.env` sync.
 - **New faces**: drop a folder with `index.html` (+ optional `face.json`)
   into `ui/face/faces/` — it is listed and served automatically.
 - **New board verbs**: extend `ALLOWED` in `crates/board/src/main.rs`.
@@ -198,6 +211,9 @@ save you gigabytes and hours).
 - **No mic audio**: check PipeWire/ALSA device + desktop mic-privacy
   settings; `mic_device` in `voice.json` can pin a device by name
   substring.
+- **Changed `.env` but the runtime ignores it**: expected — `.env`
+  only seeds missing values. Use `openbutler config set <key> <value>`,
+  which writes the live JSON and the seed together.
 - **TypeError-ish silence after interrupt**: fixed long ago (stale-stop
   guard) — report with `logs/voice.log` lines if you ever hit a mute.
 

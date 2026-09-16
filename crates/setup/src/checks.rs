@@ -78,7 +78,7 @@ fn check_env_file(home: &Path) -> Check {
     if !p.is_file() {
         return fail("env-file", "no .env (run `setup init`)".into());
     }
-    let vars = crate::envfile::load(home);
+    let vars = openbutler_setup::envfile::load(home);
     for k in ["AGENT_NAME", "MEMORY_VAULT", "VOICE_CONTAINER"] {
         if vars.get(k).map(|s| s.is_empty()).unwrap_or(true) {
             return fail("env-file", format!(".env present but {k} is empty"));
@@ -88,8 +88,8 @@ fn check_env_file(home: &Path) -> Check {
 }
 
 fn check_render_clean(home: &Path) -> Check {
-    let vars = crate::envfile::load(home);
-    let drift = crate::render::check_all(home, &vars);
+    let vars = openbutler_setup::envfile::load(home);
+    let drift = openbutler_setup::render::check_all(home, &vars);
     if drift.is_empty() {
         ok("render", "configs match .env".into())
     } else {
@@ -104,7 +104,7 @@ fn check_render_clean(home: &Path) -> Check {
 }
 
 fn check_vault(home: &Path) -> Check {
-    let vars = crate::envfile::load(home);
+    let vars = openbutler_setup::envfile::load(home);
     let raw = vars.get("MEMORY_VAULT").cloned().unwrap_or_default();
     if raw.is_empty() {
         return fail("vault", "MEMORY_VAULT unset".into());
@@ -200,8 +200,8 @@ fn check_wake(home: &Path) -> Check {
     if missing.is_empty() && bad.is_empty() {
         // Configured classifier (wake.model): pinned entries get a sha
         // check, custom ids just need the file in the cache dir.
-        let (id, _) = crate::render::effective_wake_model(home);
-        let reg = crate::render::wake_registry(home)
+        let (id, _) = openbutler_setup::render::effective_wake_model(home);
+        let reg = openbutler_setup::render::wake_registry(home)
             .into_iter()
             .find(|m| m.id == id);
         let file = reg
@@ -305,7 +305,7 @@ fn check_ports() -> Check {
 }
 
 fn check_toolbox(home: &Path) -> Check {
-    let vars = crate::envfile::load(home);
+    let vars = openbutler_setup::envfile::load(home);
     let c = vars
         .get("VOICE_CONTAINER")
         .cloned()
@@ -334,6 +334,7 @@ fn check_binaries(home: &Path) -> Check {
     let td = home.join("target/debug");
     let mut missing: Vec<&str> = vec![];
     for b in [
+        "openbutler",
         "openbutler-voice",
         "openbutler-face",
         "openbutler-board",
@@ -349,7 +350,7 @@ fn check_binaries(home: &Path) -> Check {
     if missing.is_empty() {
         ok(
             "rust-bins",
-            "all 7 present (see `voice config` etc.)".into(),
+            "all 8 present (see `openbutler config` etc.)".into(),
         )
     } else {
         fail(

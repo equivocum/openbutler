@@ -10,10 +10,8 @@
 // Host-buildable: only openbutler-common + serde_json.
 
 mod checks;
-mod envfile;
 mod fix;
 mod init;
-mod render;
 
 const NAME: &str = "openbutler-setup";
 const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -24,6 +22,7 @@ fn print_help() {
     println!("  check              audit .env, configs, models, devices (exit 1 on gaps)");
     println!("  init [--yes]       interactive setup walk; --yes takes defaults non-interactively");
     println!("  fix                repair known drift, confirming each item");
+    println!("  (all settings live under one CLI: `openbutler config set <key> <value>`)");
 }
 
 fn main() {

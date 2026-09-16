@@ -40,7 +40,7 @@ fn confirm(lines: &mut std::io::Lines<std::io::StdinLock<'_>>, label: &str, def_
 }
 
 fn run_render(home: &Path, vars: &std::collections::BTreeMap<String, String>) -> bool {
-    match crate::render::render_all(home, vars) {
+    match openbutler_setup::render::render_all(home, vars) {
         Ok(written) => {
             println!("rendered {}.", written.join(", "));
             true
@@ -183,8 +183,8 @@ fn fetch_wake(home: &Path, lines: &mut std::io::Lines<std::io::StdinLock<'_>>, y
     // Configured classifier (wake.model): fetch when the registry pins it
     // and the cache lacks it. Custom (unpinned) ids must be placed by hand.
     {
-        let (id, _) = crate::render::effective_wake_model(home);
-        if let Some(m) = crate::render::wake_registry(home)
+        let (id, _) = openbutler_setup::render::effective_wake_model(home);
+        if let Some(m) = openbutler_setup::render::wake_registry(home)
             .into_iter()
             .find(|m| m.id == id)
         {
@@ -224,7 +224,7 @@ fn fetch_wake(home: &Path, lines: &mut std::io::Lines<std::io::StdinLock<'_>>, y
 }
 
 pub fn run(home: &Path, yes: bool) -> i32 {
-    let cur = crate::envfile::load(home);
+    let cur = openbutler_setup::envfile::load(home);
     let get = |k: &str, d: &str| cur.get(k).cloned().unwrap_or_else(|| d.to_string());
     let stdin = std::io::stdin();
     let mut lines = stdin.lock().lines();
@@ -337,7 +337,7 @@ pub fn run(home: &Path, yes: bool) -> i32 {
             }
         }
         for (k, val) in cur.iter() {
-            if !crate::envfile::KNOWN_KEYS.contains(&k.as_str()) {
+            if !openbutler_setup::envfile::KNOWN_KEYS.contains(&k.as_str()) {
                 v.entry(k.clone()).or_insert(val.clone());
             }
         }
@@ -358,7 +358,7 @@ pub fn run(home: &Path, yes: bool) -> i32 {
             }
         }
     }
-    if let Err(e) = crate::envfile::write(home, &vals) {
+    if let Err(e) = openbutler_setup::envfile::write(home, &vals) {
         eprintln!("{e}");
         return 1;
     }
@@ -371,11 +371,11 @@ pub fn run(home: &Path, yes: bool) -> i32 {
     // trained classifier — see README).
     {
         let agent = vals.get("AGENT_NAME").map(|s| s.as_str()).unwrap_or("");
-        if let Some(m) = crate::render::derive_wake_model(home, agent) {
-            let (id, phrase) = crate::render::ensure_wake_model(home, &m.id);
+        if let Some(m) = openbutler_setup::render::derive_wake_model(home, agent) {
+            let (id, phrase) = openbutler_setup::render::ensure_wake_model(home, &m.id);
             println!("wake word: \"{phrase}\" (model {id}).");
         } else {
-            let (id, phrase) = crate::render::effective_wake_model(home);
+            let (id, phrase) = openbutler_setup::render::effective_wake_model(home);
             if agent.is_empty() {
                 println!("wake word: \"{phrase}\" (model {id}).");
             } else {
