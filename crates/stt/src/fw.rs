@@ -348,7 +348,6 @@ impl FwEngine {
                 let sp = (sliced[0] - tb) as f64;
                 let ep = (sliced[sliced.len() - 1] - tb) as f64;
                 segs.push(RawSeg {
-                    seek: sk,
                     start: time_offset + sp * TIME_PRECISION,
                     end: time_offset + ep * TIME_PRECISION,
                     tokens: sliced.to_vec(),
@@ -371,7 +370,6 @@ impl FwEngine {
             }
             (
                 vec![RawSeg {
-                    seek,
                     start: time_offset,
                     end: time_offset + duration,
                     tokens: tokens.to_vec(),
@@ -410,7 +408,11 @@ impl FwEngine {
 
             let w3 = self.window_features(&feats, seek, segment_size);
             let shape = w3.shape().to_vec();
-            let mut flat = w3.as_standard_layout().into_owned().into_raw_vec();
+            let mut flat = w3
+                .as_standard_layout()
+                .into_owned()
+                .into_raw_vec_and_offset()
+                .0;
             let storage = sys::StorageView::new(&shape, flat.as_mut_slice(), ct2rs::Device::CPU)
                 .map_err(|e| format!("storage: {e:?}"))?;
             let encoder = self
@@ -474,7 +476,6 @@ impl FwEngine {
 }
 
 struct RawSeg {
-    seek: i64,
     start: f64,
     end: f64,
     tokens: Vec<usize>,

@@ -89,38 +89,18 @@ struct WakeChild {
 pub struct WakeServe {
     bin: std::path::PathBuf,
     model_file: String,
-    pub phrase: String,
     child: Option<WakeChild>,
     next_id: u64,
-    pub unavailable: bool,
 }
 
 impl WakeServe {
-    pub fn new(home: &Path, cfg: &serde_json::Map<String, Value>) -> Result<Self, String> {
-        let (_, file, phrase) = resolve(home, cfg);
-        Self::from_parts(file, phrase)
-    }
-
-    pub fn from_parts(model_file: String, phrase: String) -> Result<Self, String> {
+    pub fn from_parts(model_file: String) -> Result<Self, String> {
         Ok(Self {
             bin: find_stts_bin()?,
             model_file,
-            phrase,
             child: None,
             next_id: 0,
-            unavailable: false,
         })
-    }
-
-    /// Switch models live: drops the serve child so the next tick loads
-    /// the new classifier (buffers restart — safer than carryover).
-    pub fn set_model(&mut self, home: &Path, cfg: &serde_json::Map<String, Value>) {
-        let (_, file, phrase) = resolve(home, cfg);
-        if file != self.model_file {
-            self.model_file = file;
-            self.phrase = phrase;
-            self.kill();
-        }
     }
 
     fn ensure(&mut self) -> Result<(), String> {
@@ -215,6 +195,7 @@ impl WakeServe {
 /// One tick's worth of mic audio: exactly 1280 samples @16k.
 pub const WAKE_TICK_SAMPLES: usize = TICK_SAMPLES;
 
+#[cfg(test)]
 pub fn encode_tick(samples: &[i16]) -> String {
     use base64::Engine as _;
     let bytes: Vec<u8> = samples.iter().flat_map(|s| s.to_le_bytes()).collect();

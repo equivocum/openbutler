@@ -102,12 +102,12 @@ fn load_config(path: &Path) -> BoardCfg {
         let p = orb.get("path").and_then(|v| v.as_str()).unwrap_or("");
         orb.insert("path".into(), Value::String(C::expand(p)));
     }
-    let name = str_field(&user, "name", "Assistant");
+    let name = str_field(&user, "name", C::settings::DEFAULT_NAME);
     let mut port: u16 = user
         .get("port")
         .and_then(|v| v.as_u64())
         .and_then(|n| u16::try_from(n).ok())
-        .unwrap_or(8794);
+        .unwrap_or(C::settings::DEFAULT_BOARD_PORT);
     if !has_port {
         if let Ok(v) = std::env::var("HANDS_PORT") {
             if let Ok(n) = v.trim().parse::<u16>() {
@@ -662,7 +662,7 @@ fn discover_port(cfg_path: &Path, port_flag: Option<u16>) -> u16 {
             }
         }
     }
-    8794
+    C::settings::DEFAULT_BOARD_PORT
 }
 
 fn cmd_mode(cfg_path: &Path, port_flag: Option<u16>, json_arg: Option<String>) -> i32 {

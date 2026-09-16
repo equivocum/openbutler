@@ -1,8 +1,6 @@
-/* `openbutler config` — the one easy CLI for every setting.
-Tuning keys write the live JSON; `.env`-seeded keys sync the seed too;
-identity keys (`name`, `memory_vault`) re-render so managed values
-propagate. Validation + routing come from openbutler-common, so this
-CLI and `voice config` can never disagree. */
+// `openbutler config` — the one CLI for every setting: tuning keys write
+// the live JSON, seeded keys sync `.env` too, identity keys re-render.
+// Validation + routing come from openbutler-common.
 
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -14,13 +12,11 @@ const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[derive(Clone, Copy, PartialEq)]
 enum Target {
-    /* Live JSON via the shared registry; Seeds in `.env` stay in sync
-    where `env_seed` is set, but the JSON is the runtime truth. */
+    // Live JSON is the runtime truth; `.env` seed synced where set.
     Tuning,
-    /* `.env` only — no JSON counterpart (container, attribution). */
+    // `.env` only, no JSON counterpart.
     Env,
-    /* `.env` plus a re-render, so managed values propagate to the JSONs
-    (assistant name, vault path). */
+    // `.env` plus a re-render, so managed values propagate.
     EnvRender,
 }
 

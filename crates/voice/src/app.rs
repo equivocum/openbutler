@@ -89,7 +89,7 @@ fn wake_cycle(
             return;
         }
     };
-    let mut serve = match crate::wake::WakeServe::from_parts(model_file, phrase.clone()) {
+    let mut serve = match crate::wake::WakeServe::from_parts(model_file) {
         Ok(s) => s,
         Err(e) => {
             let _ = tx.send(Event::MicError(format!("wake scorer unavailable: {e}")));

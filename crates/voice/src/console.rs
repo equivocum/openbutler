@@ -5,8 +5,7 @@
 // normalization (never prefixes); quit phrases are the one exception —
 // those are substring matches, as in Python.
 
-/* Settings registry, validation, and file routing live in openbutler-common
-so every config CLI shares them; voice keeps thin re-exports. */
+// Settings core lives in openbutler-common; voice re-exports it.
 pub use openbutler_common::settings::{
     find_setting, get_setting, parse_setting, write_config_key, write_setting, SETTINGS,
 };

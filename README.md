@@ -214,6 +214,11 @@ save you gigabytes and hours).
 - **Changed `.env` but the runtime ignores it**: expected — `.env`
   only seeds missing values. Use `openbutler config set <key> <value>`,
   which writes the live JSON and the seed together.
+- **A live `configs/*.json` is corrupted (not valid JSON)**: `setup check`
+  reports render drift and `config set` refuses to touch it — nothing is
+  silently rebuilt. Run `openbutler-setup fix`: it quarantines the broken
+  file to `.unwired` (with your confirm) and re-renders from `.env`.
+  `init --yes` will not overwrite it.
 - **TypeError-ish silence after interrupt**: fixed long ago (stale-stop
   guard) — report with `logs/voice.log` lines if you ever hit a mute.
 

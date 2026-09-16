@@ -844,6 +844,16 @@ fn elevenlabs_synth(text: &str, el: &ElevenLabsCfg) -> Result<(u32, Vec<i16>), S
     Ok((EL_RATE, pcm))
 }
 
+// Prefetched audio may replay only for the exact sentence + generation it
+// was synthed for; anything else synthesizes fresh, so every queued
+// sentence is heard.
+fn pipeline_usable(stashed: Option<(u64, &str)>, gen: u64, sentence: &str) -> bool {
+    match stashed {
+        Some((sg, stext)) => sg == gen && stext == sentence,
+        None => false,
+    }
+}
+
 fn worker_loop(
     rx: std::sync::mpsc::Receiver<(u64, String, Option<Vec<String>>)>,
     stop: Arc<AtomicBool>,
@@ -859,7 +869,8 @@ fn worker_loop(
     let mut pump_rate: u32 = 0;
     let mut stashed: Option<(u64, String, Option<Vec<String>>)> = None;
     let mut next_synth: Option<std::thread::JoinHandle<Option<(u32, Vec<i16>)>>> = None;
-    let mut stashed_audio: Option<(u32, Vec<i16>)> = None;
+    // Identity-tagged prefetch audio; pipeline_usable enforces the match.
+    let mut stashed_audio: Option<(u64, String, u32, Vec<i16>)> = None;
     loop {
         let (g, sentence, directions) = match stashed.take() {
             Some(it) => it,
@@ -928,16 +939,27 @@ fn worker_loop(
         signals.set_state("speaking");
         let v = voice.lock().unwrap().clone();
         let sp = *speed.lock().unwrap();
-        // Use pre-synthesized audio from pipeline if available,
-        // otherwise synthesize now.
-        let audio = if let Some(a) = stashed_audio.take() {
-            log(&format!(
-                "[mouth] pipeline hit — skipping synth for {} chars",
-                sentence.len()
-            ));
-            Some(a)
-        } else {
-            match elevenlabs_synth(&sentence, &cfg.elevenlabs) {
+        // Use pre-synthesized audio from pipeline only when it matches the
+        // exact (possibly batch-merged) sentence of this generation;
+        // otherwise synthesize fresh so every queued sentence is heard.
+        let audio = match stashed_audio.take() {
+            Some((sg, stext, rate, pcm)) if pipeline_usable(Some((sg, &stext)), g, &sentence) => {
+                log(&format!(
+                    "[mouth] pipeline hit — skipping synth for {} chars",
+                    sentence.len()
+                ));
+                Some((rate, pcm))
+            }
+            stale => {
+                if stale.is_some() {
+                    log("[mouth] pipeline stash mismatch — synthesizing fresh");
+                }
+                None
+            }
+        };
+        let audio = match audio {
+            Some(a) => Some(a),
+            None => match elevenlabs_synth(&sentence, &cfg.elevenlabs) {
                 Ok(a) => {
                     log(&format!(
                         "[mouth] elevenlabs spoke {} chars",
@@ -959,7 +981,7 @@ fn worker_loop(
                         }
                     }
                 }
-            }
+            },
         };
         if let Some((rate, pcm)) = audio {
             if pump.is_none() || pump_rate != rate {
@@ -1045,14 +1067,13 @@ fn worker_loop(
                 }
             }
         }
-        // Pipeline result: join the background synth handle that was
-        // spawned during drain. If it produced audio, stash both the
-        // text (for next loop) and the audio (to skip re-synth).
+        // Join the background synth; stash tagged for pipeline_usable.
         if let Some(h) = next_synth.take() {
-            if let Ok(Some(a)) = h.join() {
-                stashed_audio = Some(a);
-            }
+            let joined = h.join().ok().flatten();
             if let Some((ng, nsent, ndirs)) = next_prefetch {
+                if let Some((rate, pcm)) = joined {
+                    stashed_audio = Some((ng, nsent.clone(), rate, pcm));
+                }
                 stashed = Some((ng, nsent, ndirs));
             }
         }
@@ -1102,6 +1123,23 @@ fn worker_loop(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn pipeline_replays_only_exact_match() {
+        // Exact sentence + generation: replay (the fast path).
+        assert!(pipeline_usable(Some((3, "Hey.")), 3, "Hey."));
+        // Batch-merged text covers more than the audio: fresh synth.
+        assert!(!pipeline_usable(Some((3, "Hey.")), 3, "Hey. You."));
+        assert!(!pipeline_usable(
+            Some((3, "Hey, yeah I'm here!")),
+            3,
+            "Hey, yeah I'm here! What's on your mind?"
+        ));
+        // Barge-in revoked the generation: fresh synth, no leak.
+        assert!(!pipeline_usable(Some((3, "Hey.")), 4, "Hey."));
+        // Nothing stashed: fresh synth.
+        assert!(!pipeline_usable(None, 3, "Hey."));
+    }
 
     #[test]
     fn sentences_split_like_python() {

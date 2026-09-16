@@ -154,8 +154,21 @@ fn render_board(home: &Path, vars: &BTreeMap<String, String>) -> (PathBuf, Strin
     )
 }
 
-/// Render all three configs. Returns the relative paths written.
+// Renders all three configs. Refuses when a live file exists but is not
+// valid JSON — rebuilding it from the template would wipe custom keys.
 pub fn render_all(home: &Path, vars: &BTreeMap<String, String>) -> Result<Vec<String>, String> {
+    for rel in [
+        "configs/voice.json",
+        "configs/face.json",
+        "configs/board.json",
+    ] {
+        let p = home.join(rel);
+        if p.is_file() && !openbutler_common::is_json_object(&p) {
+            return Err(format!(
+                "{rel} is not valid JSON — refusing to overwrite (run `setup fix` to quarantine and re-render)"
+            ));
+        }
+    }
     let mut written = vec![];
     for (path, text) in [
         render_voice(home, vars),
@@ -372,6 +385,20 @@ mod tests {
         assert_eq!(b["orbs"][0]["path"], serde_json::json!("/home/u/vault"));
         // Clean right after a render.
         assert!(check_all(&dir, &vars()).is_empty());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn corrupt_live_refuses_without_touching() {
+        let dir = std::env::temp_dir().join(format!("ob-render3-{}", std::process::id()));
+        let _ = std::fs::create_dir_all(dir.join("configs"));
+        render_all(&dir, &vars()).unwrap();
+        std::fs::write(dir.join("configs/voice.json"), "{oops").unwrap();
+        assert!(render_all(&dir, &vars()).is_err());
+        assert_eq!(
+            std::fs::read_to_string(dir.join("configs/voice.json")).unwrap(),
+            "{oops"
+        );
         let _ = std::fs::remove_dir_all(&dir);
     }
 
